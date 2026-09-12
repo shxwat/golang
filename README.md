@@ -5,6 +5,15 @@ backend APIs, error handling, concurrency patterns, and small worker-based
 systems. Each example focuses on one concept so it can be read and run without a
 large application setup.
 
+## Start Here
+
+Begin with [`00-first-program/main.go`](./00-first-program/main.go). It is the
+first program in this learning journey and appears at the top of the repository.
+
+```sh
+go run ./00-first-program
+```
+
 ## What This Repository Covers
 
 - Go syntax, variables, arrays, slices, maps, loops, and `defer`
@@ -20,6 +29,7 @@ large application setup.
 
 | Path | Contents |
 | --- | --- |
+| `00-first-program/` | The starting point: a simple first Go program |
 | `basic/` | Core syntax, data types, control flow, arrays, and slices |
 | `functions/` | Parameters, return values, calculations, and variadic functions |
 | `maps/` | Map creation, lookup, update, and pricing/age examples |
