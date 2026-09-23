@@ -1,75 +1,153 @@
 package main
 
 import (
+	"booking-app/helper"
+	"database/sql"
 	"fmt"
-	"strings"
+	"log"
+	"sync"
+	"time"
+
+	_ "github.com/lib/pq"
 )
 
+type UserData struct {
+	firstName       string
+	lastName        string
+	email           string
+	numberOfTickets uint
+}
+
+var conferenceName = "Go Conference"
+
+const ConferenceTicket = 50
+
+var remainingTickets uint = 50
+
+// var bookings = make([]UserData, 0) //empty slice
+
+var wg = sync.WaitGroup{}
+
+var db *sql.DB
+
+func initDB() {
+	var err error
+
+	connStr := "host=localhost port=5432 user=shashwat dbname=bookingapp sslmode=disable"
+
+	db, err = sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatal("Error opening connection:", err)
+	}
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatal("Database is not reachable:", err)
+	}
+	fmt.Println("Connected to PostgreSQL successfully!!")
+}
+
 func main() {
-
-	conferenceName := "Go Conference"
-	const ConferenceTicket = 50
-	var remainingTickets uint = 50
-
-	var bookings []string //empty slice
-
-	fmt.Printf("Welcome to %v booking application.\n", conferenceName)
-	fmt.Printf("We have total %v tickets and %v are still available.\n", ConferenceTicket, remainingTickets)
-	fmt.Println("Get your tickets here to attend.")
+	initDB()
+	greetUser()
 
 	for {
+		firstName, lastName, email, userTickets := getUserInput()
 
-		var firstName string
-		var lastName string
-		var email string
-		var userTickets uint
+		isValidName, isValidEmail, isValidTicketNumber := helper.ValidateUserInput(firstName, lastName, email, userTickets, remainingTickets)
 
-		fmt.Println("\nEnter your firstname: ")
-		fmt.Scan(&firstName)
+		wg.Add(1)
 
-		fmt.Println("Enter your lastname: ")
-		fmt.Scan(&lastName)
-
-		fmt.Println("Enter your email: ")
-		fmt.Scan(&email)
-
-		fmt.Println("Enter the number of tickets: ")
-		fmt.Scan(&userTickets)
-
-		isValidName := len(firstName) >= 2 && len(lastName) >= 2
-		isValidEmail := strings.Contains(email, "@")
-		isValidTicketNumber := userTickets > 0 && userTickets <= remainingTickets
+		go sendTicket(userTickets, firstName, lastName, email)
 
 		if isValidName && isValidEmail && isValidTicketNumber {
-
-			bookings = append(bookings, firstName+" "+lastName)
-			remainingTickets = remainingTickets - userTickets
-
-			fmt.Printf("Thank you %v %v for booking %v tickets. You will receive a confirmation email at %v\n", firstName, lastName, userTickets, email)
-			fmt.Printf("%v tickets remaining for %v\n", remainingTickets, conferenceName)
-
-			//list of bookings
-			fmt.Printf("These are all our bookings so far: %v\n", bookings)
+			bookTicket(userTickets, firstName, lastName, email)
 
 			if remainingTickets == 0 {
 				fmt.Println("Our conference is booked out. Come back next year")
 				break
 			}
 
-		}else {
-			//error handling
+		} else {
 			if !isValidName {
-				fmt.Println("Error: first name or last name is too short.")
+				fmt.Println("Error: First name or last name is too short")
 			}
-			if !isValidEmail{
-				fmt.Println("Error: Email address doesn't contain @ sign.")
+			if !isValidEmail {
+				fmt.Println("Error: Email address doesn't contain @ sign")
 			}
-			if !isValidTicketNumber{
-				fmt.Println("Error: We only have %v tickets remaining, so you can't book %v tickets.\n", remainingTickets, userTickets)
+			if !isValidTicketNumber {
+				fmt.Printf("Error: we have %v tickets remaining, so you can't book %v tickets.\n", remainingTickets, userTickets)
 			}
-			fmt.Println("Please try again")
+			fmt.Println("Please try again....")
 		}
+	}
+}
 
+func greetUser() {
+	fmt.Printf("Welcome to %v booking application.\n", conferenceName)
+	fmt.Printf("We have total %v tickets and %v are still available.\n", ConferenceTicket, remainingTickets)
+	fmt.Println("Get your tickets here to attend.")
+}
+func getUserInput() (string, string, string, uint) {
+
+	var firstName string
+	var lastName string
+	var email string
+	var userTickets uint
+
+	fmt.Println("\nEnter your firstname: ")
+	fmt.Scan(&firstName)
+
+	fmt.Println("Enter your lastname: ")
+	fmt.Scan(&lastName)
+
+	fmt.Println("Enter your email: ")
+	fmt.Scan(&email)
+
+	fmt.Println("Enter the number of tickets: ")
+	fmt.Scan(&userTickets)
+
+	return firstName, lastName, email, userTickets
+}
+
+func bookTicket(userTickets uint, firstName string, lastName string, email string) {
+	remainingTickets = remainingTickets - userTickets
+	insertQuery := `
+		INSERT INTO bookings (first_name, last_name, email, tickets)
+		VALUES ($1, $2, $3, $4)
+	`
+
+	_, err := db.Exec(insertQuery, firstName, lastName, email, userTickets)
+	if err != nil {
+		fmt.Println("Failed to save booking to DB:", err)
+		return
 	}
 
+	fmt.Printf("Thank you %v %v for booking %v tickets. You will receive a confirmation email at %v\n", firstName, lastName, userTickets, email)
+	fmt.Printf("%v tickets ramining for %v\n", remainingTickets, conferenceName)
+
+	// var userData = UserData{
+	// 	firstName:       firstName,
+	// 	lastName:        lastName,
+	// 	email:           email,
+	// 	numberOfTickets: userTickets,
+	// }
+
+	// bookings = append(bookings, userData)
+
+	fmt.Printf("Thank you %v %v for booking %v tickets. You will receive a confirmation email at %v\n", firstName, lastName, userTickets, email)
+	fmt.Printf("%v tickets remaining for %v\n", remainingTickets, conferenceName)
+
+	//list of bookings
+	// fmt.Printf("These are all our bookings so far: %v\n", bookings)
+
+}
+func sendTicket(userTickets uint, firstName string, lastName string, email string) {
+	time.Sleep(10 * time.Second)
+	var ticket = fmt.Sprintf("%v tickets for %v %v", userTickets, firstName, lastName)
+	fmt.Println("\n################")
+	fmt.Printf("Sending ticket:\n%vto email address %v\n", ticket, email)
+	fmt.Println("\n################")
+
+	wg.Done()
 }
