@@ -4,10 +4,11 @@ import (
 	"booking-app/helper"
 	"database/sql"
 	"fmt"
-	"log"
+
 	"sync"
 	"time"
 
+	"booking-app/database"
 	_ "github.com/lib/pq"
 )
 
@@ -30,25 +31,8 @@ var wg = sync.WaitGroup{}
 
 var db *sql.DB
 
-func initDB() {
-	var err error
-
-	connStr := "host=localhost port=5432 user=shashwat dbname=bookingapp sslmode=disable"
-
-	db, err = sql.Open("postgres", connStr)
-	if err != nil {
-		log.Fatal("Error opening connection:", err)
-	}
-
-	err = db.Ping()
-	if err != nil {
-		log.Fatal("Database is not reachable:", err)
-	}
-	fmt.Println("Connected to PostgreSQL successfully!!")
-}
-
 func main() {
-	initDB()
+	database.InitDB()
 	greetUser()
 
 	for {
@@ -112,34 +96,15 @@ func getUserInput() (string, string, string, uint) {
 
 func bookTicket(userTickets uint, firstName string, lastName string, email string) {
 	remainingTickets = remainingTickets - userTickets
-	insertQuery := `
-		INSERT INTO bookings (first_name, last_name, email, tickets)
-		VALUES ($1, $2, $3, $4)
-	`
 
-	_, err := db.Exec(insertQuery, firstName, lastName, email, userTickets)
+	err := database.SavingBooking(firstName, lastName, email, userTickets)
 	if err != nil {
-		fmt.Println("Failed to save booking to DB:", err)
+		fmt.Println("Failed to save bookings!!", err)
+		remainingTickets = remainingTickets + userTickets
 		return
 	}
-
-	fmt.Printf("Thank you %v %v for booking %v tickets. You will receive a confirmation email at %v\n", firstName, lastName, userTickets, email)
-	fmt.Printf("%v tickets ramining for %v\n", remainingTickets, conferenceName)
-
-	// var userData = UserData{
-	// 	firstName:       firstName,
-	// 	lastName:        lastName,
-	// 	email:           email,
-	// 	numberOfTickets: userTickets,
-	// }
-
-	// bookings = append(bookings, userData)
-
 	fmt.Printf("Thank you %v %v for booking %v tickets. You will receive a confirmation email at %v\n", firstName, lastName, userTickets, email)
 	fmt.Printf("%v tickets remaining for %v\n", remainingTickets, conferenceName)
-
-	//list of bookings
-	// fmt.Printf("These are all our bookings so far: %v\n", bookings)
 
 }
 func sendTicket(userTickets uint, firstName string, lastName string, email string) {
